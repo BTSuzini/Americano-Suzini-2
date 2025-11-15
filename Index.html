@@ -107,7 +107,7 @@
     select {
       font-size: 0.8rem;
       padding: 0.1rem 0.2rem;
-      max-width: 120px;
+      max-width: 130px;
     }
     .matches-actions {
       display: flex;
@@ -169,7 +169,7 @@
 <body>
 <header>
   <div class="logo-wrap">
-    <!-- Logo Club B : simple rond avec B, tu pourras le remplacer plus tard -->
+    <!-- Logo Club B -->
     <svg viewBox="0 0 100 100">
       <defs>
         <linearGradient id="gradB" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -191,7 +191,7 @@
   </div>
   <div>
     <h1>Americano Beach Tennis – Club B</h1>
-    <p>Rotations, saisie des scores et classements automatiques.</p>
+    <p>Rotations pré-générées, saisie des scores & classements automatiques.</p>
   </div>
 </header>
 
@@ -211,12 +211,11 @@
         Rotation :
         <select id="rotationSelect"></select>
       </div>
-      <button id="addMatchBtn">➕ Ajouter un match à cette rotation</button>
       <button id="clearScoresBtn" class="secondary">🧹 Effacer tous les scores</button>
     </div>
     <div class="hint">
-      1) Avant le tournoi : définis les matchs (noms des équipes) rotation par rotation.<br>
-      2) Pendant le tournoi : tu n'as plus qu'à saisir les scores, les équipes restent en place (sauvegarde dans le navigateur).
+      Planning déjà rempli (toutes les rotations).<br>
+      Tu n'as plus qu'à saisir les scores : les classements se mettent à jour automatiquement.
     </div>
     <div style="max-height: 420px; overflow:auto; border:1px solid #e0e0e0; border-radius:8px;">
       <table id="matchesTable">
@@ -229,7 +228,6 @@
             <th>F B</th>
             <th>Pts A</th>
             <th>Pts B</th>
-            <th></th>
           </tr>
         </thead>
         <tbody>
@@ -289,7 +287,7 @@
 </main>
 
 <script>
-/* ==== CONFIG JOUEURS ==== */
+/* ==== JOUEURS ==== */
 const MEN = [
   "Quentin S",
   "Jenda",
@@ -322,31 +320,12 @@ const PLAYERS = [
   ...WOMEN.map(name => ({ name, sex: "F" })),
 ];
 
-const STORAGE_KEY = "americano_matches_by_rotation_v1";
+const STORAGE_KEY = "americano_matches_preplanned_v1";
 
-/* ==== ÉTAT DES MATCHS ====
-   Chaque match : {
-     id, rotation, court,
-     manA, womanA, manB, womanB,
-     ptsA, ptsB
-   }
-*/
 let matches = [];
 let nextId = 1;
 
-/* ==== UTILITAIRES ==== */
-function createPlayerOptions(list) {
-  const opts = ['<option value=""></option>'];
-  list.forEach(name => {
-    opts.push(`<option value="${name}">${name}</option>`);
-  });
-  return opts.join("");
-}
-
-const OPTIONS_MEN = createPlayerOptions(MEN);
-const OPTIONS_WOMEN = createPlayerOptions(WOMEN);
-
-/* ==== RENDU JOUEURS ==== */
+/* ==== LISTE JOUEURS ==== */
 function renderPlayers() {
   const container = document.getElementById("playersList");
   container.innerHTML = "";
@@ -361,14 +340,111 @@ function renderPlayers() {
   });
 }
 
-/* ==== GESTION ROTATIONS ==== */
+/* ==== GÉNÉRATION AUTOMATIQUE DU PLANNING ====
+   Objectif :
+   - chaque homme joue avec chaque femme exactement une fois
+   - on forme des matchs (2 équipes) avec joueurs distincts
+   - max 4 matchs par rotation
+*/
+function generateInitialMatches() {
+  const allPairs = [];
+  for (let i = 0; i < MEN.length; i++) {
+    for (let j = 0; j < WOMEN.length; j++) {
+      allPairs.push({ m: i, w: j });
+    }
+  }
+  let unassigned = allPairs.slice();
+  const manUse = Array(MEN.length).fill(0);
+  const womanUse = Array(WOMEN.length).fill(0);
+
+  const rotations = []; // chaque élément = liste de matchs, match = [pairA, pairB]
+  const maxMatchesPerRotation = 4;
+
+  while (unassigned.length > 0) {
+    const usedMen = new Set();
+    const usedWomen = new Set();
+    const matchesRot = [];
+
+    while (matchesRot.length < maxMatchesPerRotation && unassigned.length > 0) {
+      const candPairs = unassigned.slice().sort((a, b) => {
+        const sa = manUse[a.m] + womanUse[a.w];
+        const sb = manUse[b.m] + womanUse[b.w];
+        if (sa !== sb) return sa - sb;
+        if (manUse[a.m] !== manUse[b.m]) return manUse[a.m] - manUse[b.m];
+        return womanUse[a.w] - womanUse[b.w];
+      });
+
+      let foundMatch = false;
+
+      for (let ia = 0; ia < candPairs.length; ia++) {
+        const pA = candPairs[ia];
+        const mA = pA.m, wA = pA.w;
+        if (usedMen.has(mA) || usedWomen.has(wA)) continue;
+
+        for (let ib = ia + 1; ib < candPairs.length; ib++) {
+          const pB = candPairs[ib];
+          const mB = pB.m, wB = pB.w;
+          if (mB === mA || wB === wA) continue;
+          if (usedMen.has(mB) || usedWomen.has(wB)) continue;
+
+          // On a un match valide
+          matchesRot.push([pA, pB]);
+
+          // enlever les paires de unassigned
+          unassigned = unassigned.filter(p =>
+            !((p.m === mA && p.w === wA) || (p.m === mB && p.w === wB))
+          );
+
+          usedMen.add(mA); usedMen.add(mB);
+          usedWomen.add(wA); usedWomen.add(wB);
+          manUse[mA]++; manUse[mB]++;
+          womanUse[wA]++; womanUse[wB]++;
+
+          foundMatch = true;
+          break;
+        }
+        if (foundMatch) break;
+      }
+
+      if (!foundMatch) break;
+    }
+
+    if (matchesRot.length > 0) {
+      rotations.push(matchesRot);
+    } else {
+      // sécurité pour éviter boucle infinie (ne devrait pas arriver ici)
+      break;
+    }
+  }
+
+  const result = [];
+  let id = 1;
+  for (let r = 0; r < rotations.length; r++) {
+    const rot = rotations[r];
+    for (let c = 0; c < rot.length; c++) {
+      const [pA, pB] = rot[c];
+      result.push({
+        id: id++,
+        rotation: r + 1,
+        court: c + 1,
+        manA: MEN[pA.m],
+        womanA: WOMEN[pA.w],
+        manB: MEN[pB.m],
+        womanB: WOMEN[pB.w],
+        ptsA: "",
+        ptsB: ""
+      });
+    }
+  }
+  return result;
+}
+
+/* ==== ROTATIONS ==== */
 function getAllRotations() {
   const set = new Set(matches.map(m => m.rotation));
-  if (set.size === 0) {
-    // par défaut, on crée 1..14
-    for (let r = 1; r <= 14; r++) set.add(r);
-  }
-  return Array.from(set).sort((a,b)=>a-b);
+  const list = Array.from(set);
+  list.sort((a,b)=>a-b);
+  return list;
 }
 
 function renderRotationSelect() {
@@ -381,34 +457,6 @@ function renderRotationSelect() {
   sel.value = current;
 }
 
-/* ==== MATCHES : CRUD ==== */
-function addMatchToRotation(rot) {
-  matches.push({
-    id: nextId++,
-    rotation: rot,
-    court: "",
-    manA: "",
-    womanA: "",
-    manB: "",
-    womanB: "",
-    ptsA: "",
-    ptsB: ""
-  });
-  saveMatches();
-  renderRotationSelect();
-  renderMatchesTable();
-  recomputeStandings();
-}
-
-function deleteMatch(id) {
-  if (!confirm("Supprimer ce match ?")) return;
-  matches = matches.filter(m => m.id !== id);
-  saveMatches();
-  renderRotationSelect();
-  renderMatchesTable();
-  recomputeStandings();
-}
-
 /* ==== LOCALSTORAGE ==== */
 function saveMatches() {
   const payload = { matches, nextId };
@@ -419,8 +467,8 @@ function loadMatches() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) {
-      matches = [];
-      nextId = 1;
+      matches = generateInitialMatches();
+      nextId = matches.length + 1;
       return;
     }
     const parsed = JSON.parse(raw);
@@ -428,17 +476,17 @@ function loadMatches() {
       matches = parsed.matches;
       nextId = parsed.nextId || (matches.reduce((mx,m)=>Math.max(mx,m.id),0)+1);
     } else {
-      matches = [];
-      nextId = 1;
+      matches = generateInitialMatches();
+      nextId = matches.length + 1;
     }
   } catch (e) {
-    console.warn("Erreur lecture stockage local", e);
-    matches = [];
-    nextId = 1;
+    console.warn("Erreur stockage, nouvel horaire généré", e);
+    matches = generateInitialMatches();
+    nextId = matches.length + 1;
   }
 }
 
-/* ==== RENDU TABLEAU MATCHES POUR LA ROTATION COURANTE ==== */
+/* ==== TABLEAU MATCHES (rotation courante) ==== */
 function renderMatchesTable() {
   const tbody = document.querySelector("#matchesTable tbody");
   const sel = document.getElementById("rotationSelect");
@@ -453,31 +501,11 @@ function renderMatchesTable() {
   list.forEach(m => {
     const tr = document.createElement("tr");
     tr.innerHTML = `
-      <td>
-        <input type="number" min="1" max="8"
-               data-id="${m.id}" data-field="court"
-               value="${m.court !== "" ? m.court : ""}">
-      </td>
-      <td>
-        <select data-id="${m.id}" data-field="manA">
-          ${OPTIONS_MEN}
-        </select>
-      </td>
-      <td>
-        <select data-id="${m.id}" data-field="womanA">
-          ${OPTIONS_WOMEN}
-        </select>
-      </td>
-      <td>
-        <select data-id="${m.id}" data-field="manB">
-          ${OPTIONS_MEN}
-        </select>
-      </td>
-      <td>
-        <select data-id="${m.id}" data-field="womanB">
-          ${OPTIONS_WOMEN}
-        </select>
-      </td>
+      <td>${m.court || ""}</td>
+      <td>${m.manA}</td>
+      <td>${m.womanA}</td>
+      <td>${m.manB}</td>
+      <td>${m.womanB}</td>
       <td>
         <input type="number" min="0"
                data-id="${m.id}" data-field="ptsA"
@@ -488,33 +516,8 @@ function renderMatchesTable() {
                data-id="${m.id}" data-field="ptsB"
                value="${m.ptsB !== "" ? m.ptsB : ""}">
       </td>
-      <td>
-        <button class="danger" data-delete="${m.id}">✖</button>
-      </td>
     `;
     tbody.appendChild(tr);
-  });
-
-  // Appliquer les valeurs dans les <select>
-  list.forEach(m => {
-    const row = tbody.querySelector(`button[data-delete="${m.id}"]`).closest("tr");
-    row.querySelector('select[data-field="manA"]').value = m.manA || "";
-    row.querySelector('select[data-field="womanA"]').value = m.womanA || "";
-    row.querySelector('select[data-field="manB"]').value = m.manB || "";
-    row.querySelector('select[data-field="womanB"]').value = m.womanB || "";
-  });
-
-  // Écouteurs
-  tbody.querySelectorAll("select").forEach(selEl => {
-    selEl.addEventListener("change", e => {
-      const id = Number(e.target.dataset.id);
-      const field = e.target.dataset.field;
-      const match = matches.find(m => m.id === id);
-      if (!match) return;
-      match[field] = e.target.value || "";
-      saveMatches();
-      // pas besoin de recompute standings si noms seulement
-    });
   });
 
   tbody.querySelectorAll('input[type="number"]').forEach(inp => {
@@ -524,25 +527,14 @@ function renderMatchesTable() {
       const match = matches.find(m => m.id === id);
       if (!match) return;
       const v = e.target.value;
-      if (field === "court") {
-        match[field] = v === "" ? "" : Number(v);
-      } else {
-        match[field] = v === "" ? "" : Number(v);
-      }
+      match[field] = v === "" ? "" : Number(v);
       saveMatches();
       recomputeStandings();
     });
   });
-
-  tbody.querySelectorAll("button[data-delete]").forEach(btn => {
-    btn.addEventListener("click", e => {
-      const id = Number(e.target.dataset.delete);
-      deleteMatch(id);
-    });
-  });
 }
 
-/* ==== EFFACER SCORES ==== */
+/* ==== SCORES ==== */
 function clearAllScores() {
   if (!confirm("Effacer tous les scores (les matchs restent) ?")) return;
   matches = matches.map(m => ({
@@ -561,9 +553,11 @@ function recomputeStandings() {
   PLAYERS.forEach(p => { points[p.name] = 0; });
 
   matches.forEach(m => {
-    if (m.manA && m.womanA && m.manB && m.womanB &&
-        m.ptsA !== "" && m.ptsB !== "" &&
-        !isNaN(m.ptsA) && !isNaN(m.ptsB)) {
+    if (
+      m.manA && m.womanA && m.manB && m.womanB &&
+      m.ptsA !== "" && m.ptsB !== "" &&
+      !isNaN(m.ptsA) && !isNaN(m.ptsB)
+    ) {
       const a = Number(m.ptsA);
       const b = Number(m.ptsB);
       if (!isNaN(a)) {
@@ -612,34 +606,11 @@ document.addEventListener("DOMContentLoaded", () => {
   renderPlayers();
   loadMatches();
   renderRotationSelect();
-  // s'il n'y a aucun match, on crée quelques lignes par défaut pour la rotation 1
-  if (matches.length === 0) {
-    const defaultRot = 1;
-    for (let i = 1; i <= 4; i++) {
-      matches.push({
-        id: nextId++,
-        rotation: defaultRot,
-        court: i,
-        manA: "",
-        womanA: "",
-        manB: "",
-        womanB: "",
-        ptsA: "",
-        ptsB: ""
-      });
-    }
-    saveMatches();
-  }
   renderMatchesTable();
   recomputeStandings();
 
   document.getElementById("rotationSelect").addEventListener("change", () => {
     renderMatchesTable();
-  });
-
-  document.getElementById("addMatchBtn").addEventListener("click", () => {
-    const rot = Number(document.getElementById("rotationSelect").value) || 1;
-    addMatchToRotation(rot);
   });
 
   document.getElementById("clearScoresBtn").addEventListener("click", clearAllScores);
