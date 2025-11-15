@@ -2,12 +2,594 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8" />
-  <title>TEST AMERICANO</title>
+  <title>Americano Beach Tennis - Classements</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    body {
+      margin: 0;
+      padding: 0;
+      background: #f4f4f8;
+      color: #222;
+    }
+    header {
+      background: #1f7ac4;
+      color: white;
+      padding: 1rem 1.3rem;
+    }
+    header h1 {
+      margin: 0;
+      font-size: 1.4rem;
+    }
+    header p {
+      margin: 0.3rem 0 0;
+      font-size: 0.9rem;
+      opacity: 0.9;
+    }
+    main {
+      padding: 1rem;
+      max-width: 1100px;
+      margin: 0 auto 2rem;
+    }
+    h2 {
+      margin-top: 1.5rem;
+      font-size: 1.2rem;
+    }
+    .card {
+      background: white;
+      border-radius: 10px;
+      padding: 1rem;
+      margin-bottom: 1rem;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+    }
+    .players-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: .5rem .75rem;
+      font-size: 0.9rem;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.2rem 0.5rem;
+      border-radius: 999px;
+      background: #eef5ff;
+    }
+    .badge span.role {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-right: 0.35rem;
+      padding: 0.1rem 0.35rem;
+      border-radius: 999px;
+      color: white;
+    }
+    .badge span.role.H {
+      background: #1f7ac4;
+    }
+    .badge span.role.F {
+      background: #e84a8a;
+    }
+    .badge span.name {
+      font-weight: 500;
+    }
+
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      font-size: 0.85rem;
+    }
+    th, td {
+      border-bottom: 1px solid #e0e0e0;
+      padding: 0.35rem 0.4rem;
+      text-align: left;
+    }
+    th {
+      background: #f0f4ff;
+      font-weight: 600;
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+    tr:nth-child(even) td {
+      background: #fafafa;
+    }
+    input[type="number"] {
+      width: 3rem;
+      padding: 0.1rem 0.2rem;
+      font-size: 0.8rem;
+    }
+    select {
+      font-size: 0.8rem;
+      padding: 0.1rem 0.2rem;
+    }
+    .matches-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-bottom: 0.5rem;
+      align-items: center;
+      justify-content: space-between;
+    }
+    button {
+      border-radius: 999px;
+      border: none;
+      padding: 0.4rem 0.9rem;
+      font-size: 0.8rem;
+      cursor: pointer;
+      background: #1f7ac4;
+      color: white;
+      font-weight: 500;
+    }
+    button.secondary {
+      background: #e0e0e0;
+      color: #333;
+    }
+    button.danger {
+      background: #e05050;
+    }
+    button:disabled {
+      opacity: 0.5;
+      cursor: default;
+    }
+    .standings-container {
+      display: grid;
+      grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr);
+      gap: 0.75rem;
+    }
+    @media (max-width: 900px) {
+      .standings-container {
+        grid-template-columns: minmax(0,1fr);
+      }
+    }
+    .pill {
+      display: inline-block;
+      padding: 0.15rem 0.5rem;
+      border-radius: 999px;
+      background: #eef2ff;
+      font-size: 0.75rem;
+      margin-left: 0.4rem;
+    }
+    .hint {
+      font-size: 0.75rem;
+      color: #666;
+      margin-top: 0.25rem;
+    }
+  </style>
 </head>
 <body>
-  <h1 style="font-size:40px;color:red;text-align:center;margin-top:40px;">
-    COUCOU  BTSUZINI 👋
-  </h1>
-  <p style="text-align:center;">Si tu vois ce texte, c'est bien le bon fichier index.html.</p>
+<header>
+  <h1>Americano Beach Tennis – Scores & Classements</h1>
+  <p>Tournoi mixte – saisie des scores en ligne et classements automatiques.</p>
+</header>
+
+<main>
+  <!-- Joueurs -->
+  <section class="card">
+    <h2>👥 Joueurs</h2>
+    <p style="margin-top:0;">Liste pré-remplie avec tes joueurs (hommes & femmes).</p>
+    <div class="players-list" id="playersList"></div>
+  </section>
+
+  <!-- Matches -->
+  <section class="card">
+    <h2>🏓 Matches</h2>
+    <div class="matches-actions">
+      <div>
+        <button id="addMatchBtn">➕ Ajouter un match</button>
+        <button id="clearScoresBtn" class="secondary">🧹 Effacer tous les scores</button>
+      </div>
+      <div class="hint">
+        Choisis les joueurs pour chaque match et saisis les points A / B.<br/>
+        Les classements se mettent à jour automatiquement.
+      </div>
+    </div>
+
+    <div style="max-height: 420px; overflow:auto; border:1px solid #e0e0e0; border-radius:8px;">
+      <table id="matchesTable">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>H A</th>
+            <th>F A</th>
+            <th>H B</th>
+            <th>F B</th>
+            <th>Pts A</th>
+            <th>Pts B</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          <!-- lignes de matchs générées en JS -->
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Classements -->
+  <section class="card">
+    <h2>📊 Classements</h2>
+    <p style="margin-top:0;">Basés sur la somme des points marqués dans toutes les équipes où le joueur apparaît.</p>
+    <div class="standings-container">
+      <div>
+        <h3>🏆 Global <span class="pill" id="globalInfo"></span></h3>
+        <table id="tableGlobal">
+          <thead>
+            <tr>
+              <th>Rang</th>
+              <th>Joueur</th>
+              <th>Sexe</th>
+              <th>Points</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div>
+        <h3>👨 Hommes</h3>
+        <table id="tableMen">
+          <thead>
+            <tr>
+              <th>Rang</th>
+              <th>Joueur</th>
+              <th>Points</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div>
+        <h3>👩 Femmes</h3>
+        <table id="tableWomen">
+          <thead>
+            <tr>
+              <th>Rang</th>
+              <th>Joueur</th>
+              <th>Points</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+/**
+ * Joueurs pré-remplis (ceux que tu m'as donnés)
+ */
+const MEN = [
+  "Quentin S",
+  "Jenda",
+  "Loïc Suzini",
+  "Loïc Kourou",
+  "Jules",
+  "Andreas",
+  "Romain",
+  "Quentin C",
+  "Patrice"
+];
+
+const WOMEN = [
+  "Karine",
+  "Manon",
+  "Émilie",
+  "Marine",
+  "Camille",
+  "Tamily",
+  "Eliana",
+  "Erika",
+  "Mylène",
+  "Guylmour",
+  "Emma",
+  "Melanie"
+];
+
+const PLAYERS = [
+  ...MEN.map(name => ({ name, sex: "H" })),
+  ...WOMEN.map(name => ({ name, sex: "F" })),
+];
+
+// LocalStorage keys
+const STORAGE_KEY_MATCHES = "americano_matches_v1";
+
+/**
+ * Etat en mémoire : liste de matches
+ * Chaque match = { manA, womanA, manB, womanB, ptsA, ptsB }
+ */
+let matches = [];
+
+/**
+ * Utils
+ */
+function createPlayerOptions(sexFilter) {
+  const opts = ['<option value="">–</option>'];
+  const list = PLAYERS.filter(p => p.sex === sexFilter);
+  for (const p of list) {
+    opts.push(`<option value="${p.name}">${p.name}</option>`);
+  }
+  return opts.join("");
+}
+
+const OPTIONS_MEN = createPlayerOptions("H");
+const OPTIONS_WOMEN = createPlayerOptions("F");
+
+/**
+ * Rendu de la liste de joueurs
+ */
+function renderPlayers() {
+  const container = document.getElementById("playersList");
+  container.innerHTML = "";
+  PLAYERS.forEach(p => {
+    const div = document.createElement("div");
+    div.className = "badge";
+    div.innerHTML = `
+      <span class="role ${p.sex}">${p.sex === "H" ? "H" : "F"}</span>
+      <span class="name">${p.name}</span>
+    `;
+    container.appendChild(div);
+  });
+}
+
+/**
+ * Rendu du tableau de matches
+ */
+function renderMatchesTable() {
+  const tbody = document.querySelector("#matchesTable tbody");
+  tbody.innerHTML = "";
+  matches.forEach((m, index) => {
+    const tr = document.createElement("tr");
+
+    tr.innerHTML = `
+      <td>${index + 1}</td>
+      <td>
+        <select data-index="${index}" data-field="manA">
+          ${OPTIONS_MEN}
+        </select>
+      </td>
+      <td>
+        <select data-index="${index}" data-field="womanA">
+          ${OPTIONS_WOMEN}
+        </select>
+      </td>
+      <td>
+        <select data-index="${index}" data-field="manB">
+          ${OPTIONS_MEN}
+        </select>
+      </td>
+      <td>
+        <select data-index="${index}" data-field="womanB">
+          ${OPTIONS_WOMEN}
+        </select>
+      </td>
+      <td>
+        <input type="number" min="0" data-index="${index}" data-field="ptsA" />
+      </td>
+      <td>
+        <input type="number" min="0" data-index="${index}" data-field="ptsB" />
+      </td>
+      <td>
+        <button class="danger" data-delete="${index}">✖</button>
+      </td>
+    `;
+
+    tbody.appendChild(tr);
+
+    // Remplir les valeurs existantes
+    const selects = tr.querySelectorAll("select");
+    selects.forEach(sel => {
+      const field = sel.getAttribute("data-field");
+      sel.value = matches[index][field] || "";
+    });
+    const inputs = tr.querySelectorAll("input[type='number']");
+    inputs.forEach(inp => {
+      const field = inp.getAttribute("data-field");
+      const val = matches[index][field];
+      inp.value = (val !== undefined && val !== null) ? val : "";
+    });
+  });
+
+  // Gestion des changements (sélecteurs & inputs)
+  tbody.querySelectorAll("select").forEach(sel => {
+    sel.addEventListener("change", (e) => {
+      const idx = parseInt(e.target.getAttribute("data-index"), 10);
+      const field = e.target.getAttribute("data-field");
+      matches[idx][field] = e.target.value || "";
+      saveMatches();
+      recomputeStandings();
+    });
+  });
+  tbody.querySelectorAll("input[type='number']").forEach(inp => {
+    inp.addEventListener("input", (e) => {
+      const idx = parseInt(e.target.getAttribute("data-index"), 10);
+      const field = e.target.getAttribute("data-field");
+      const val = e.target.value.trim();
+      matches[idx][field] = val === "" ? "" : Number(val);
+      saveMatches();
+      recomputeStandings();
+    });
+  });
+  tbody.querySelectorAll("button[data-delete]").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      const idx = parseInt(e.target.getAttribute("data-delete"), 10);
+      if (confirm("Supprimer ce match ?")) {
+        matches.splice(idx, 1);
+        saveMatches();
+        renderMatchesTable();
+        recomputeStandings();
+      }
+    });
+  });
+}
+
+/**
+ * Ajout d'un match vide
+ */
+function addMatch() {
+  matches.push({
+    manA: "",
+    womanA: "",
+    manB: "",
+    womanB: "",
+    ptsA: "",
+    ptsB: ""
+  });
+  saveMatches();
+  renderMatchesTable();
+}
+
+/**
+ * Effacer tous les scores (mais garder la structure des matchs)
+ */
+function clearScores() {
+  if (!confirm("Effacer tous les scores (les matchs resteront) ?")) return;
+  matches = matches.map(m => ({
+    ...m,
+    ptsA: "",
+    ptsB: ""
+  }));
+  saveMatches();
+  renderMatchesTable();
+  recomputeStandings();
+}
+
+/**
+ * Persistance localStorage
+ */
+function saveMatches() {
+  localStorage.setItem(STORAGE_KEY_MATCHES, JSON.stringify(matches));
+}
+
+function loadMatches() {
+  const raw = localStorage.getItem(STORAGE_KEY_MATCHES);
+  if (!raw) return;
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      matches = parsed;
+    }
+  } catch (e) {
+    console.warn("Erreur parse localStorage", e);
+  }
+}
+
+/**
+ * Recalcul des classements
+ */
+function recomputeStandings() {
+  // Init points à 0
+  const points = {};
+  PLAYERS.forEach(p => {
+    points[p.name] = 0;
+  });
+
+  // Additionner les points pour chaque match
+  matches.forEach(m => {
+    if (
+      m.manA && m.womanA && m.manB && m.womanB &&
+      m.ptsA !== "" && m.ptsB !== "" &&
+      !isNaN(m.ptsA) && !isNaN(m.ptsB)
+    ) {
+      const valA = Number(m.ptsA);
+      const valB = Number(m.ptsB);
+      if (!isNaN(valA)) {
+        points[m.manA] += valA;
+        points[m.womanA] += valA;
+      }
+      if (!isNaN(valB)) {
+        points[m.manB] += valB;
+        points[m.womanB] += valB;
+      }
+    }
+  });
+
+  // Construire listes triées
+  const all = PLAYERS.map(p => ({
+    name: p.name,
+    sex: p.sex,
+    pts: points[p.name] || 0
+  }));
+
+  const sortedGlobal = [...all].sort((a,b) => b.pts - a.pts || a.name.localeCompare(b.name));
+  const sortedMen    = sortedGlobal.filter(p => p.sex === "H");
+  const sortedWomen  = sortedGlobal.filter(p => p.sex === "F");
+
+  // Rendu
+  const globalBody = document.querySelector("#tableGlobal tbody");
+  const menBody    = document.querySelector("#tableMen tbody");
+  const womenBody  = document.querySelector("#tableWomen tbody");
+  globalBody.innerHTML = "";
+  menBody.innerHTML    = "";
+  womenBody.innerHTML  = "";
+
+  sortedGlobal.forEach((p, idx) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${idx+1}</td>
+      <td>${p.name}</td>
+      <td>${p.sex}</td>
+      <td>${p.pts}</td>
+    `;
+    globalBody.appendChild(tr);
+  });
+
+  sortedMen.forEach((p, idx) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${idx+1}</td>
+      <td>${p.name}</td>
+      <td>${p.pts}</td>
+    `;
+    menBody.appendChild(tr);
+  });
+
+  sortedWomen.forEach((p, idx) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${idx+1}</td>
+      <td>${p.name}</td>
+      <td>${p.pts}</td>
+    `;
+    womenBody.appendChild(tr);
+  });
+
+  // Info globale
+  const info = document.getElementById("globalInfo");
+  const totalMatchesWithScores = matches.filter(m =>
+    m.ptsA !== "" && m.ptsB !== "" && !isNaN(m.ptsA) && !isNaN(m.ptsB)
+  ).length;
+  info.textContent = `${totalMatchesWithScores} match(es) noté(s) – ${sortedGlobal.length} joueurs`;
+}
+
+/**
+ * Init
+ */
+document.addEventListener("DOMContentLoaded", () => {
+  renderPlayers();
+  loadMatches();
+  if (matches.length === 0) {
+    // Tu peux changer ce nombre pour pré-créer un certain nombre de lignes
+    for (let i = 0; i < 10; i++) {
+      matches.push({
+        manA: "",
+        womanA: "",
+        manB: "",
+        womanB: "",
+        ptsA: "",
+        ptsB: ""
+      });
+    }
+    saveMatches();
+  }
+  renderMatchesTable();
+  recomputeStandings();
+
+  document.getElementById("addMatchBtn").addEventListener("click", addMatch);
+  document.getElementById("clearScoresBtn").addEventListener("click", clearScores);
+});
+</script>
 </body>
 </html>
